@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# TuxTech Monitor V6 - Enhanced Edition
+# TuxTech Monitor V6 - Enhanced Edition with Customization
 # Advanced server monitoring with Docker, services, ports, and comprehensive system analysis
 
 # Colors for terminal output
@@ -12,31 +12,574 @@ CYAN='\033[0;36m'
 PURPLE='\033[0;35m'
 ORANGE='\033[0;33m'
 WHITE='\033[1;37m'
+PINK='\033[1;35m'
+LIGHT_BLUE='\033[1;34m'
+LIGHT_GREEN='\033[1;32m'
+LIGHT_RED='\033[1;31m'
+GRAY='\033[0;37m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 UNDERLINE='\033[4m'
+BLINK='\033[5m'
+REVERSE='\033[7m'
 
 # Configuration
 SCAN_COMMON_PORTS=(80 443 22 21 25 3306 5432 6379 8080 8443 9000 3000 5000 8000 27017 9200 11211 15672)
 LOG_FILE="/var/log/tuxtech_monitor_v6.log"
+CONFIG_FILE="/etc/tuxtech/visual_config.conf"
 
-# Function to display TuxTech ASCII logo
-display_logo() {
-    echo -e "${CYAN}${BOLD}"
-    cat << "EOF"
-╔══════════════════════════════════════════════════════════════════════════╗
-║                                                                          ║
-║  ████████╗██╗   ██╗██╗  ██╗████████╗███████╗ ██████╗██╗  ██╗  ██╗   ██╗ ███╗ ║
-║  ╚══██╔══╝██║   ██║╚██╗██╔╝╚══██╔══╝██╔════╝██╔════╝██║  ██║  ██║   ██║████║ ║
-║     ██║   ██║   ██║ ╚███╔╝    ██║   █████╗  ██║     ███████║  ██║   ██║█╔██║ ║
-║     ██║   ██║   ██║ ██╔██╗    ██║   ██╔══╝  ██║     ██╔══██║  ╚██╗ ██╔╝████║ ║
-║     ██║   ╚██████╔╝██╔╝ ██╗   ██║   ███████╗╚██████╗██║  ██║   ╚████╔╝ ╚██╔╝ ║
-║     ╚═╝    ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝    ╚═══╝   ╚═╝  ║
-║                                                                          ║
-║            INTEGRATED CLOUD COMPUTING PLATFORM - ENHANCED V6            ║
-╚══════════════════════════════════════════════════════════════════════════╗
+# Load visual configuration if exists
+load_visual_config() {
+    if [ -f "$CONFIG_FILE" ]; then
+        source "$CONFIG_FILE"
+    else
+        # Default values
+        LOGO_COLOR="${CYAN}"
+        BORDER_STYLE="double"  # single, double, rounded, heavy, ascii
+        LOGO_TEXT_LINE1="████████╗██╗   ██╗██╗  ██╗████████╗███████╗ ██████╗██╗  ██╗  ██╗   ██╗ ███╗"
+        LOGO_TEXT_LINE2="╚══██╔══╝██║   ██║╚██╗██╔╝╚══██╔══╝██╔════╝██╔════╝██║  ██║  ██║   ██║████║"
+        LOGO_TEXT_LINE3="   ██║   ██║   ██║ ╚███╔╝    ██║   █████╗  ██║     ███████║  ██║   ██║█╔██║"
+        LOGO_TEXT_LINE4="   ██║   ██║   ██║ ██╔██╗    ██║   ██╔══╝  ██║     ██╔══██║  ╚██╗ ██╔╝████║"
+        LOGO_TEXT_LINE5="   ██║   ╚██████╔╝██╔╝ ██╗   ██║   ███████╗╚██████╗██║  ██║   ╚████╔╝ ╚██╔╝"
+        LOGO_TEXT_LINE6="   ╚═╝    ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝    ╚═══╝   ╚═╝"
+        BOTTOM_TEXT="INTEGRATED CLOUD COMPUTING PLATFORM - ENHANCED V6"
+        CUSTOM_LOGO_ENABLED=false
+    fi
+}
+
+# Save visual configuration
+save_visual_config() {
+    mkdir -p /etc/tuxtech
+    cat > "$CONFIG_FILE" << EOF
+# TuxTech Monitor V6 Visual Configuration
+LOGO_COLOR="${LOGO_COLOR}"
+BORDER_STYLE="${BORDER_STYLE}"
+LOGO_TEXT_LINE1="${LOGO_TEXT_LINE1}"
+LOGO_TEXT_LINE2="${LOGO_TEXT_LINE2}"
+LOGO_TEXT_LINE3="${LOGO_TEXT_LINE3}"
+LOGO_TEXT_LINE4="${LOGO_TEXT_LINE4}"
+LOGO_TEXT_LINE5="${LOGO_TEXT_LINE5}"
+LOGO_TEXT_LINE6="${LOGO_TEXT_LINE6}"
+BOTTOM_TEXT="${BOTTOM_TEXT}"
+CUSTOM_LOGO_ENABLED="${CUSTOM_LOGO_ENABLED}"
 EOF
+    echo -e "${GREEN}✓ Configuration saved to $CONFIG_FILE${NC}"
+}
+
+# Get border characters based on style
+get_border_chars() {
+    case $BORDER_STYLE in
+        "single")
+            BORDER_TOP_LEFT="┌"
+            BORDER_TOP_RIGHT="┐"
+            BORDER_BOTTOM_LEFT="└"
+            BORDER_BOTTOM_RIGHT="┘"
+            BORDER_HORIZONTAL="─"
+            BORDER_VERTICAL="│"
+            ;;
+        "double")
+            BORDER_TOP_LEFT="╔"
+            BORDER_TOP_RIGHT="╗"
+            BORDER_BOTTOM_LEFT="╚"
+            BORDER_BOTTOM_RIGHT="╝"
+            BORDER_HORIZONTAL="═"
+            BORDER_VERTICAL="║"
+            ;;
+        "rounded")
+            BORDER_TOP_LEFT="╭"
+            BORDER_TOP_RIGHT="╮"
+            BORDER_BOTTOM_LEFT="╰"
+            BORDER_BOTTOM_RIGHT="╯"
+            BORDER_HORIZONTAL="─"
+            BORDER_VERTICAL="│"
+            ;;
+        "heavy")
+            BORDER_TOP_LEFT="┏"
+            BORDER_TOP_RIGHT="┓"
+            BORDER_BOTTOM_LEFT="┗"
+            BORDER_BOTTOM_RIGHT="┛"
+            BORDER_HORIZONTAL="━"
+            BORDER_VERTICAL="┃"
+            ;;
+        "ascii")
+            BORDER_TOP_LEFT="+"
+            BORDER_TOP_RIGHT="+"
+            BORDER_BOTTOM_LEFT="+"
+            BORDER_BOTTOM_RIGHT="+"
+            BORDER_HORIZONTAL="-"
+            BORDER_VERTICAL="|"
+            ;;
+        *)
+            # Default to double
+            BORDER_TOP_LEFT="╔"
+            BORDER_TOP_RIGHT="╗"
+            BORDER_BOTTOM_LEFT="╚"
+            BORDER_BOTTOM_RIGHT="╝"
+            BORDER_HORIZONTAL="═"
+            BORDER_VERTICAL="║"
+            ;;
+    esac
+}
+
+# Function to display TuxTech ASCII logo with customization
+display_logo() {
+    load_visual_config
+    get_border_chars
+    
+    local border_line=""
+    for i in {1..78}; do
+        border_line="${border_line}${BORDER_HORIZONTAL}"
+    done
+    
+    echo -e "${LOGO_COLOR}${BOLD}"
+    echo "${BORDER_TOP_LEFT}${border_line}${BORDER_TOP_RIGHT}"
+    echo "${BORDER_VERTICAL}                                                                              ${BORDER_VERTICAL}"
+    
+    if [ "$CUSTOM_LOGO_ENABLED" = true ]; then
+        echo "${BORDER_VERTICAL}  ${LOGO_TEXT_LINE1}  ${BORDER_VERTICAL}"
+        echo "${BORDER_VERTICAL}  ${LOGO_TEXT_LINE2}  ${BORDER_VERTICAL}"
+        echo "${BORDER_VERTICAL}  ${LOGO_TEXT_LINE3}  ${BORDER_VERTICAL}"
+        echo "${BORDER_VERTICAL}  ${LOGO_TEXT_LINE4}  ${BORDER_VERTICAL}"
+        echo "${BORDER_VERTICAL}  ${LOGO_TEXT_LINE5}  ${BORDER_VERTICAL}"
+        echo "${BORDER_VERTICAL}  ${LOGO_TEXT_LINE6}  ${BORDER_VERTICAL}"
+    else
+        cat << EOF
+${BORDER_VERTICAL}  ████████╗██╗   ██╗██╗  ██╗████████╗███████╗ ██████╗██╗  ██╗  ██╗   ██╗ ███╗ ${BORDER_VERTICAL}
+${BORDER_VERTICAL}  ╚══██╔══╝██║   ██║╚██╗██╔╝╚══██╔══╝██╔════╝██╔════╝██║  ██║  ██║   ██║████║ ${BORDER_VERTICAL}
+${BORDER_VERTICAL}     ██║   ██║   ██║ ╚███╔╝    ██║   █████╗  ██║     ███████║  ██║   ██║█╔██║ ${BORDER_VERTICAL}
+${BORDER_VERTICAL}     ██║   ██║   ██║ ██╔██╗    ██║   ██╔══╝  ██║     ██╔══██║  ╚██╗ ██╔╝████║ ${BORDER_VERTICAL}
+${BORDER_VERTICAL}     ██║   ╚██████╔╝██╔╝ ██╗   ██║   ███████╗╚██████╗██║  ██║   ╚████╔╝ ╚██╔╝ ${BORDER_VERTICAL}
+${BORDER_VERTICAL}     ╚═╝    ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚══════╝ ╚═════╝╚═╝  ╚═╝    ╚═══╝   ╚═╝  ${BORDER_VERTICAL}
+EOF
+    fi
+    
+    echo "${BORDER_VERTICAL}                                                                              ${BORDER_VERTICAL}"
+    
+    # Center the bottom text
+    local text_length=${#BOTTOM_TEXT}
+    local padding=$(( (76 - text_length) / 2 ))
+    local padded_text=""
+    for i in $(seq 1 $padding); do
+        padded_text="${padded_text} "
+    done
+    padded_text="${padded_text}${BOTTOM_TEXT}"
+    
+    echo "${BORDER_VERTICAL}  ${padded_text}  ${BORDER_VERTICAL}"
+    echo "${BORDER_BOTTOM_LEFT}${border_line}${BORDER_BOTTOM_RIGHT}"
     echo -e "${NC}"
+}
+
+# Visual customization menu
+visual_customization() {
+    clear
+    echo -e "${PURPLE}${BOLD}[VISUAL CUSTOMIZATION]${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}\n"
+    
+    load_visual_config
+    
+    echo -e "${YELLOW}Current Configuration:${NC}"
+    echo -e "  Logo Color: ${LOGO_COLOR}████${NC} (Sample)"
+    echo -e "  Border Style: ${CYAN}$BORDER_STYLE${NC}"
+    echo -e "  Bottom Text: ${WHITE}$BOTTOM_TEXT${NC}"
+    echo -e "  Custom Logo: ${CYAN}$CUSTOM_LOGO_ENABLED${NC}\n"
+    
+    echo -e "${BOLD}Customization Options:${NC}"
+    echo -e "  ${CYAN}1)${NC}  Change Logo Color"
+    echo -e "  ${CYAN}2)${NC}  Change Border Style"
+    echo -e "  ${CYAN}3)${NC}  Edit Bottom Text"
+    echo -e "  ${CYAN}4)${NC}  Custom ASCII Logo"
+    echo -e "  ${CYAN}5)${NC}  Preview Current Design"
+    echo -e "  ${CYAN}6)${NC}  Reset to Defaults"
+    echo -e "  ${CYAN}7)${NC}  Load Preset Themes"
+    echo -e "  ${CYAN}8)${NC}  Export Configuration"
+    echo -e "  ${CYAN}9)${NC}  Import Configuration"
+    echo -e "  ${CYAN}0)${NC}  Save and Return to Main Menu\n"
+    
+    read -p "Select option: " choice
+    
+    case $choice in
+        1)
+            change_logo_color
+            ;;
+        2)
+            change_border_style
+            ;;
+        3)
+            edit_bottom_text
+            ;;
+        4)
+            custom_ascii_logo
+            ;;
+        5)
+            clear
+            display_logo
+            echo -e "${CYAN}Press Enter to continue...${NC}"
+            read
+            visual_customization
+            ;;
+        6)
+            reset_to_defaults
+            ;;
+        7)
+            load_preset_themes
+            ;;
+        8)
+            export_configuration
+            ;;
+        9)
+            import_configuration
+            ;;
+        0)
+            save_visual_config
+            main_menu
+            ;;
+        *)
+            echo -e "${RED}Invalid option${NC}"
+            sleep 2
+            visual_customization
+            ;;
+    esac
+}
+
+# Change logo color
+change_logo_color() {
+    clear
+    echo -e "${PURPLE}${BOLD}[CHANGE LOGO COLOR]${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}\n"
+    
+    echo -e "${YELLOW}Available Colors:${NC}"
+    echo -e "  ${CYAN}1) Cyan ████████${NC}"
+    echo -e "  ${GREEN}2) Green ████████${NC}"
+    echo -e "  ${BLUE}3) Blue ████████${NC}"
+    echo -e "  ${YELLOW}4) Yellow ████████${NC}"
+    echo -e "  ${PURPLE}5) Purple ████████${NC}"
+    echo -e "  ${RED}6) Red ████████${NC}"
+    echo -e "  ${WHITE}7) White ████████${NC}"
+    echo -e "  ${PINK}8) Pink ████████${NC}"
+    echo -e "  ${LIGHT_BLUE}9) Light Blue ████████${NC}"
+    echo -e "  ${LIGHT_GREEN}10) Light Green ████████${NC}"
+    echo -e "  ${ORANGE}11) Orange ████████${NC}"
+    echo -e "  ${GRAY}12) Gray ████████${NC}\n"
+    
+    read -p "Select color (1-12): " color_choice
+    
+    case $color_choice in
+        1) LOGO_COLOR="${CYAN}" ;;
+        2) LOGO_COLOR="${GREEN}" ;;
+        3) LOGO_COLOR="${BLUE}" ;;
+        4) LOGO_COLOR="${YELLOW}" ;;
+        5) LOGO_COLOR="${PURPLE}" ;;
+        6) LOGO_COLOR="${RED}" ;;
+        7) LOGO_COLOR="${WHITE}" ;;
+        8) LOGO_COLOR="${PINK}" ;;
+        9) LOGO_COLOR="${LIGHT_BLUE}" ;;
+        10) LOGO_COLOR="${LIGHT_GREEN}" ;;
+        11) LOGO_COLOR="${ORANGE}" ;;
+        12) LOGO_COLOR="${GRAY}" ;;
+        *) echo -e "${RED}Invalid choice${NC}" ;;
+    esac
+    
+    echo -e "\n${GREEN}✓ Logo color updated${NC}"
+    sleep 2
+    visual_customization
+}
+
+# Change border style
+change_border_style() {
+    clear
+    echo -e "${PURPLE}${BOLD}[CHANGE BORDER STYLE]${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}\n"
+    
+    echo -e "${YELLOW}Available Border Styles:${NC}\n"
+    
+    echo -e "${CYAN}1) Single Line:${NC}"
+    echo "   ┌────────────┐"
+    echo "   │   Sample   │"
+    echo "   └────────────┘"
+    
+    echo -e "\n${CYAN}2) Double Line:${NC}"
+    echo "   ╔════════════╗"
+    echo "   ║   Sample   ║"
+    echo "   ╚════════════╝"
+    
+    echo -e "\n${CYAN}3) Rounded:${NC}"
+    echo "   ╭────────────╮"
+    echo "   │   Sample   │"
+    echo "   ╰────────────╯"
+    
+    echo -e "\n${CYAN}4) Heavy:${NC}"
+    echo "   ┏━━━━━━━━━━━━┓"
+    echo "   ┃   Sample   ┃"
+    echo "   ┗━━━━━━━━━━━━┛"
+    
+    echo -e "\n${CYAN}5) ASCII:${NC}"
+    echo "   +------------+"
+    echo "   |   Sample   |"
+    echo "   +------------+"
+    
+    echo
+    read -p "Select border style (1-5): " border_choice
+    
+    case $border_choice in
+        1) BORDER_STYLE="single" ;;
+        2) BORDER_STYLE="double" ;;
+        3) BORDER_STYLE="rounded" ;;
+        4) BORDER_STYLE="heavy" ;;
+        5) BORDER_STYLE="ascii" ;;
+        *) echo -e "${RED}Invalid choice${NC}" ;;
+    esac
+    
+    echo -e "\n${GREEN}✓ Border style updated to: $BORDER_STYLE${NC}"
+    sleep 2
+    visual_customization
+}
+
+# Edit bottom text
+edit_bottom_text() {
+    clear
+    echo -e "${PURPLE}${BOLD}[EDIT BOTTOM TEXT]${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}\n"
+    
+    echo -e "${YELLOW}Current bottom text:${NC}"
+    echo -e "${WHITE}$BOTTOM_TEXT${NC}\n"
+    
+    echo -e "${CYAN}Enter new bottom text (max 74 characters):${NC}"
+    read -p "> " new_text
+    
+    if [ ${#new_text} -le 74 ]; then
+        BOTTOM_TEXT="$new_text"
+        echo -e "\n${GREEN}✓ Bottom text updated${NC}"
+    else
+        echo -e "\n${RED}Text too long! Maximum 74 characters.${NC}"
+    fi
+    
+    sleep 2
+    visual_customization
+}
+
+# Custom ASCII logo editor
+custom_ascii_logo() {
+    clear
+    echo -e "${PURPLE}${BOLD}[CUSTOM ASCII LOGO]${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}\n"
+    
+    echo -e "${YELLOW}Custom Logo Editor${NC}"
+    echo -e "${CYAN}You can create your own ASCII art logo (6 lines max)${NC}\n"
+    
+    echo -e "Options:"
+    echo -e "  ${CYAN}1)${NC} Enter custom ASCII art"
+    echo -e "  ${CYAN}2)${NC} Use text-to-ASCII generator"
+    echo -e "  ${CYAN}3)${NC} Load from file"
+    echo -e "  ${CYAN}4)${NC} Use default TuxTech logo"
+    echo -e "  ${CYAN}0)${NC} Back\n"
+    
+    read -p "Select option: " logo_choice
+    
+    case $logo_choice in
+        1)
+            echo -e "\n${YELLOW}Enter your ASCII art (6 lines, press Enter after each):${NC}"
+            read -p "Line 1: " LOGO_TEXT_LINE1
+            read -p "Line 2: " LOGO_TEXT_LINE2
+            read -p "Line 3: " LOGO_TEXT_LINE3
+            read -p "Line 4: " LOGO_TEXT_LINE4
+            read -p "Line 5: " LOGO_TEXT_LINE5
+            read -p "Line 6: " LOGO_TEXT_LINE6
+            CUSTOM_LOGO_ENABLED=true
+            echo -e "\n${GREEN}✓ Custom logo saved${NC}"
+            ;;
+        2)
+            echo -e "\n${YELLOW}Enter text to convert to ASCII:${NC}"
+            read -p "> " text_input
+            
+            # Simple ASCII text (you could use figlet if available)
+            if command -v figlet &> /dev/null; then
+                ascii_text=$(figlet -f small "$text_input" 2>/dev/null | head -6)
+                LOGO_TEXT_LINE1=$(echo "$ascii_text" | sed -n '1p')
+                LOGO_TEXT_LINE2=$(echo "$ascii_text" | sed -n '2p')
+                LOGO_TEXT_LINE3=$(echo "$ascii_text" | sed -n '3p')
+                LOGO_TEXT_LINE4=$(echo "$ascii_text" | sed -n '4p')
+                LOGO_TEXT_LINE5=$(echo "$ascii_text" | sed -n '5p')
+                LOGO_TEXT_LINE6=$(echo "$ascii_text" | sed -n '6p')
+                CUSTOM_LOGO_ENABLED=true
+                echo -e "\n${GREEN}✓ ASCII art generated${NC}"
+            else
+                echo -e "${YELLOW}Install 'figlet' for ASCII text generation${NC}"
+                echo -e "Run: ${WHITE}sudo apt-get install figlet${NC}"
+            fi
+            ;;
+        3)
+            echo -e "\n${YELLOW}Enter path to ASCII art file:${NC}"
+            read -p "> " file_path
+            if [ -f "$file_path" ]; then
+                LOGO_TEXT_LINE1=$(sed -n '1p' "$file_path")
+                LOGO_TEXT_LINE2=$(sed -n '2p' "$file_path")
+                LOGO_TEXT_LINE3=$(sed -n '3p' "$file_path")
+                LOGO_TEXT_LINE4=$(sed -n '4p' "$file_path")
+                LOGO_TEXT_LINE5=$(sed -n '5p' "$file_path")
+                LOGO_TEXT_LINE6=$(sed -n '6p' "$file_path")
+                CUSTOM_LOGO_ENABLED=true
+                echo -e "\n${GREEN}✓ Logo loaded from file${NC}"
+            else
+                echo -e "${RED}File not found${NC}"
+            fi
+            ;;
+        4)
+            CUSTOM_LOGO_ENABLED=false
+            echo -e "\n${GREEN}✓ Using default TuxTech logo${NC}"
+            ;;
+        0)
+            visual_customization
+            return
+            ;;
+    esac
+    
+    sleep 2
+    visual_customization
+}
+
+# Reset to defaults
+reset_to_defaults() {
+    echo -e "\n${YELLOW}Resetting to default configuration...${NC}"
+    
+    LOGO_COLOR="${CYAN}"
+    BORDER_STYLE="double"
+    BOTTOM_TEXT="INTEGRATED CLOUD COMPUTING PLATFORM - ENHANCED V6"
+    CUSTOM_LOGO_ENABLED=false
+    
+    save_visual_config
+    echo -e "${GREEN}✓ Reset to defaults complete${NC}"
+    sleep 2
+    visual_customization
+}
+
+# Load preset themes
+load_preset_themes() {
+    clear
+    echo -e "${PURPLE}${BOLD}[PRESET THEMES]${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}\n"
+    
+    echo -e "${YELLOW}Available Themes:${NC}"
+    echo -e "  ${CYAN}1)${NC} Classic Cyan (Default)"
+    echo -e "  ${GREEN}2)${NC} Matrix Green"
+    echo -e "  ${RED}3)${NC} Red Alert"
+    echo -e "  ${PURPLE}4)${NC} Royal Purple"
+    echo -e "  ${BLUE}5)${NC} Ocean Blue"
+    echo -e "  ${YELLOW}6)${NC} Solar Yellow"
+    echo -e "  ${WHITE}7)${NC} Clean White"
+    echo -e "  ${PINK}8)${NC} Neon Pink"
+    echo -e "  ${ORANGE}9)${NC} Sunset Orange"
+    echo -e "  ${GRAY}10)${NC} Stealth Gray\n"
+    
+    read -p "Select theme (1-10): " theme_choice
+    
+    case $theme_choice in
+        1) # Classic Cyan
+            LOGO_COLOR="${CYAN}"
+            BORDER_STYLE="double"
+            BOTTOM_TEXT="INTEGRATED CLOUD COMPUTING PLATFORM - ENHANCED V6"
+            ;;
+        2) # Matrix Green
+            LOGO_COLOR="${GREEN}"
+            BORDER_STYLE="single"
+            BOTTOM_TEXT="[ SYSTEM MONITORING MATRIX - ONLINE ]"
+            ;;
+        3) # Red Alert
+            LOGO_COLOR="${RED}"
+            BORDER_STYLE="heavy"
+            BOTTOM_TEXT="⚠ CRITICAL SYSTEM MONITOR - ACTIVE ⚠"
+            ;;
+        4) # Royal Purple
+            LOGO_COLOR="${PURPLE}"
+            BORDER_STYLE="double"
+            BOTTOM_TEXT="♛ ENTERPRISE MONITORING SUITE ♛"
+            ;;
+        5) # Ocean Blue
+            LOGO_COLOR="${BLUE}"
+            BORDER_STYLE="rounded"
+            BOTTOM_TEXT="～ DEEP SEA MONITORING SYSTEM ～"
+            ;;
+        6) # Solar Yellow
+            LOGO_COLOR="${YELLOW}"
+            BORDER_STYLE="single"
+            BOTTOM_TEXT="☀ SOLAR POWERED MONITORING ☀"
+            ;;
+        7) # Clean White
+            LOGO_COLOR="${WHITE}"
+            BORDER_STYLE="single"
+            BOTTOM_TEXT="MINIMALIST MONITORING INTERFACE"
+            ;;
+        8) # Neon Pink
+            LOGO_COLOR="${PINK}"
+            BORDER_STYLE="double"
+            BOTTOM_TEXT="▼ CYBERPUNK MONITOR 2077 ▼"
+            ;;
+        9) # Sunset Orange
+            LOGO_COLOR="${ORANGE}"
+            BORDER_STYLE="rounded"
+            BOTTOM_TEXT="◉ SUNSET MONITORING DASHBOARD ◉"
+            ;;
+        10) # Stealth Gray
+            LOGO_COLOR="${GRAY}"
+            BORDER_STYLE="ascii"
+            BOTTOM_TEXT="[STEALTH MODE - MONITORING ACTIVE]"
+            ;;
+        *)
+            echo -e "${RED}Invalid choice${NC}"
+            sleep 2
+            load_preset_themes
+            return
+            ;;
+    esac
+    
+    echo -e "\n${GREEN}✓ Theme applied successfully${NC}"
+    save_visual_config
+    sleep 2
+    visual_customization
+}
+
+# Export configuration
+export_configuration() {
+    clear
+    echo -e "${PURPLE}${BOLD}[EXPORT CONFIGURATION]${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}\n"
+    
+    local export_file="$HOME/tuxtech_visual_config_$(date +%Y%m%d_%H%M%S).conf"
+    
+    cp "$CONFIG_FILE" "$export_file" 2>/dev/null || {
+        echo -e "${RED}No configuration to export${NC}"
+        sleep 2
+        visual_customization
+        return
+    }
+    
+    echo -e "${GREEN}✓ Configuration exported to:${NC}"
+    echo -e "${WHITE}$export_file${NC}\n"
+    
+    echo -e "${CYAN}Share this file to transfer your visual settings!${NC}"
+    echo -e "${YELLOW}Press Enter to continue...${NC}"
+    read
+    visual_customization
+}
+
+# Import configuration
+import_configuration() {
+    clear
+    echo -e "${PURPLE}${BOLD}[IMPORT CONFIGURATION]${NC}"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}\n"
+    
+    echo -e "${YELLOW}Enter path to configuration file:${NC}"
+    read -p "> " import_file
+    
+    if [ -f "$import_file" ]; then
+        cp "$import_file" "$CONFIG_FILE"
+        load_visual_config
+        echo -e "\n${GREEN}✓ Configuration imported successfully${NC}"
+    else
+        echo -e "\n${RED}File not found: $import_file${NC}"
+    fi
+    
+    sleep 2
+    visual_customization
 }
 
 # Enhanced server information display
@@ -862,6 +1405,7 @@ main_menu() {
     echo -e "  ${CYAN}11)${NC} Security Check"
     echo -e "  ${CYAN}12)${NC} Real-Time Monitoring"
     echo -e "  ${CYAN}13)${NC} Full System Report"
+    echo -e "  ${CYAN}14)${NC} ${PINK}Visual Customization${NC} ${YELLOW}(NEW!)${NC}"
     echo -e "  ${CYAN}0)${NC}  Exit"
     
     echo -e "\n${GREEN}════════════════════════════════════════════════════════════${NC}"
@@ -991,6 +1535,9 @@ main_menu() {
             read
             main_menu
             ;;
+        14)
+            visual_customization
+            ;;
         0)
             echo -e "${GREEN}Exiting TuxTech Monitor V6...${NC}"
             echo -e "${CYAN}Thank you for using TuxTech Monitor!${NC}"
@@ -1003,6 +1550,9 @@ main_menu() {
             ;;
     esac
 }
+
+# Initialize configuration
+load_visual_config
 
 # Script entry point
 if [ "$1" == "--realtime" ] || [ "$1" == "-r" ]; then
@@ -1017,6 +1567,8 @@ elif [ "$1" == "--services" ] || [ "$1" == "-s" ]; then
 elif [ "$1" == "--ports" ] || [ "$1" == "-p" ]; then
     display_logo
     scan_network_ports
+elif [ "$1" == "--customize" ] || [ "$1" == "-c" ]; then
+    visual_customization
 elif [ "$1" == "--report" ] || [ "$1" == "-R" ]; then
     display_logo
     echo -e "${PURPLE}${BOLD}[GENERATING FULL SYSTEM REPORT]${NC}\n"
@@ -1033,19 +1585,21 @@ elif [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  -r, --realtime    Start real-time monitoring"
-    echo "  -d, --docker      Show Docker container details"
-    echo "  -s, --services    Show all services status"
-    echo "  -p, --ports       Scan network ports"
-    echo "  -R, --report      Generate full system report"
-    echo "  -h, --help        Show this help message"
-    echo "  (no options)      Launch interactive menu"
+    echo "  -r, --realtime     Start real-time monitoring"
+    echo "  -d, --docker       Show Docker container details"
+    echo "  -s, --services     Show all services status"
+    echo "  -p, --ports        Scan network ports"
+    echo "  -c, --customize    Visual customization menu"
+    echo "  -R, --report       Generate full system report"
+    echo "  -h, --help         Show this help message"
+    echo "  (no options)       Launch interactive menu"
     echo ""
     echo "Examples:"
-    echo "  $0              # Launch interactive menu"
-    echo "  $0 --realtime   # Start real-time monitoring"
-    echo "  $0 --docker     # View Docker containers"
-    echo "  $0 --report     # Generate complete system report"
+    echo "  $0               # Launch interactive menu"
+    echo "  $0 --realtime    # Start real-time monitoring"
+    echo "  $0 --docker      # View Docker containers"
+    echo "  $0 --customize   # Customize visual appearance"
+    echo "  $0 --report      # Generate complete system report"
 else
     main_menu
 fi
